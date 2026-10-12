@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────
+#  Project Registry — Example
+#  Copy to projects.yaml and fill in real paths / identifiers.
+#  This file is safe to commit; projects.yaml is NOT.
+# ─────────────────────────────────────────────────────────────────
+
+projects:
+  - name: "My Web App"
+    repository_path: "C:/Users/YourName/code/my-web-app"
+    pycharm_project_path: "C:/Users/YourName/code/my-web-app"
+    browser_url: "http://localhost:3000"
+    dev_server_command: "npm run dev"
+    test_command: "pytest tests/"
+    build_command: "npm run build"
+    lint_command: "ruff check ."
+    # claude_code_session_id: leave blank — discovered at runtime
+    claude_code_session_id: ""
+    chat_space_ids:
+      - "spaces/REPLACE_ME"
+    verification_checklist:
+      - "Home page loads without console errors"
+      - "Login flow completes successfully"
+
+  - name: "API Service"
+    repository_path: "C:/Users/YourName/code/api-service"
+    pycharm_project_path: "C:/Users/YourName/code/api-service"
+    browser_url: "http://localhost:8000/docs"
+    dev_server_command: "uvicorn app.main:app --reload"
+    test_command: "pytest"
+    build_command: ""
+    lint_command: "ruff check ."
+    claude_code_session_id: ""
+    chat_space_ids: []
+    verification_checklist:
+      - "API docs page loads"
+      - "Health check endpoint returns 200"

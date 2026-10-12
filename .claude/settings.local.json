@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(pip --version)",
+      "Bash(pip list *)",
+      "Bash(where chrome *)",
+      "Bash(where chromium *)",
+      "Bash(where firefox *)",
+      "Bash(where code *)",
+      "Bash(where pycharm *)",
+      "Bash(where.exe chrome *)",
+      "Bash(where.exe code *)",
+      "Bash(python *)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Read(//c/Users/Pcomputer/AppData/Local/Programs/**)",
+      "Bash(pip install *)",
+      "Bash(taskkill *)",
+      "PowerShell(Stop-Process *)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\Pcomputer\\\\Desktop\\\\desktop-agent\\\\agent\\\\subagents\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Host \"done\")",
+      "PowerShell(New-Item *)"
+    ]
+  }
+}

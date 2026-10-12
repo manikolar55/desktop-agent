@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.so
+.installed.cfg
+lib/
+lib64/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# Environment / secrets — NEVER COMMIT THESE
+.env.local
+.env.production
+*.secrets
+secrets.yaml
+credentials.json
+token.json
+*.pem
+*.key
+*.p12
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PyInstaller build artefacts
+*.spec
+packaging/windows/dist/
+packaging/windows/build/
+
+# Voice models (large, downloaded at runtime)
+models/whisper/
+models/wake_word/
+
+# Playwright browsers (installed separately)
+.playwright/
+
+# Test artefacts
+.pytest_cache/
+.coverage
+htmlcov/
+reports/
+screenshots/

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "desktop-ai-agent"
+version = "0.1.0"
+description = "Cross-platform AI desktop assistant — Windows first, macOS ready"
+requires-python = ">=3.12"
+dependencies = [
+    "PySide6>=6.7",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "anthropic>=0.26",
+    "httpx>=0.27",
+    "keyring>=25",
+    "pyttsx3>=2.90",
+    "playwright>=1.44",
+    "python-dotenv>=1.0",
+    "reportlab>=4.2",
+    "PyYAML>=6.0",
+    "pywin32>=306; sys_platform=='win32'",
+]
+
+[project.optional-dependencies]
+voice = [
+    "faster-whisper>=1.0",
+    "sounddevice>=0.4",
+    "numpy>=1.26",
+]
+google = [
+    "google-api-python-client>=2.130",
+    "google-auth-httplib2>=0.2",
+    "google-auth-oauthlib>=1.2",
+]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+desktop-agent = "app:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "packaging*"]
