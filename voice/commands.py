@@ -87,6 +87,21 @@ _TASK_VERB_ANYWHERE = re.compile(
     re.I,
 )
 
+# Well-known app/site names — if these appear with a task verb anywhere in the sentence
+# (e.g. "Back on the other end, search YouTube"), treat the whole thing as a task.
+_KNOWN_TARGETS = re.compile(
+    r"\b(youtube|upwork|chrome|google|gmail|whatsapp|telegram|slack|notepad|"
+    r"spotify|netflix|twitter|facebook|instagram|linkedin|github|reddit|amazon|"
+    r"discord|zoom|teams|outlook|excel|word|powerpoint|calculator|explorer|"
+    r"cmd|terminal|task manager|settings|control panel|file explorer)\b",
+    re.I,
+)
+_TASK_VERB_MID = re.compile(
+    r"\b(open(?:ing)?|search(?:ing)?|navigat(?:e|ing)|go\s+to|launch(?:ing)?|"
+    r"find(?:ing)?|clos(?:e|ing)|start(?:ing)?|play(?:ing)?)\b",
+    re.I,
+)
+
 # If what remains starts with one of these verbs, it is a computer task.
 _TASK_VERB_START = re.compile(
     r"^\s*(open|close|navigate|go\s+to|search|find|click|type|press|send|read|write|"
@@ -146,6 +161,12 @@ def parse_command(text: str) -> ParsedCommand:
             return ParsedCommand(
                 intent=CommandIntent.NEW_TASK, text=t, task_instruction=remainder
             )
+
+    # 3c. Task verb + known app/site anywhere in sentence.
+    #     Catches "Back on the other end, search YouTube" and
+    #     "Why are you not opening YouTube?" even when garbled by Whisper.
+    if _KNOWN_TARGETS.search(t) and _TASK_VERB_MID.search(t):
+        return ParsedCommand(intent=CommandIntent.NEW_TASK, text=t, task_instruction=t)
 
     # 4. Everything else → conversational.  The LLM handles questions, opinions,
     #    capability queries, and anything Whisper garbles into non-imperative form.

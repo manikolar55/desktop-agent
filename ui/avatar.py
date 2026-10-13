@@ -545,6 +545,20 @@ class FloatingAvatar(QWidget):
         step = task.current_step_obj()
         msg = step.description[:80] if step else task.instruction[:80]
         self.set_state(ui_state, msg)
+
+        # Hide the panel during active execution so it does not appear in screenshots
+        # taken by screen_read, preventing the agent from trying to close its own UI.
+        _EXEC_STATES = {"planning", "running", "verifying"}
+        _DONE_STATES = {"completed", "failed", "cancelled", "waiting_for_approval"}
+        if task.status.value in _EXEC_STATES:
+            if self.isVisible():
+                self.setVisible(False)
+                self._orb_win.setVisible(False)
+        elif task.status.value in _DONE_STATES:
+            if not self.isVisible():
+                self.setVisible(True)
+                self._orb_win.setVisible(True)
+
         if task.status.value == "completed":
             self._orb_win._bubble.set_text("Task done!\nWhat's next?")
         elif task.status.value == "failed":

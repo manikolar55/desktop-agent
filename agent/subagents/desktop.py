@@ -25,14 +25,21 @@ Your available tools:
 - screen_click: {"x": 0, "y": 0, "button": "left"} — click at screen coordinates
 - screen_type: {"text": "..."} — type text at the current cursor position
 - screen_hotkey: {"keys": "ctrl+c"} — press a keyboard shortcut
+- wait: {"seconds": 2} — pause N seconds (use after open_app so the app has time to load)
 - wait_for_approval: {} — pause and request user approval before continuing
 - ask_user: {"question": "..."} — ask the user a clarifying question
 
 RULES:
 - Always call find_and_focus BEFORE screen_click or screen_type in a specific window.
 - Use screen_read to verify the current screen state before taking action.
+- NEVER call screen_read twice in a row — after screen_read you MUST take a concrete
+  action (click, type, hotkey, open_app, wait) before reading again.
 - Set requires_approval=true for destructive actions (deleting files, uninstalling apps, formatting).
 - Use open_app to launch a new app; use find_and_focus to switch to an already-open app.
+- After open_app, always use wait {"seconds": 2} before trying to interact with the app.
+- You will see a floating window labeled "AI Desktop Agent", "AI Agent", or "Voice Agent"
+  on screen. This is YOUR OWN control panel — NEVER close, click, or interact with it.
+  Work around it using keyboard shortcuts when it overlaps a UI element.
 
 Known app aliases: chrome, google chrome, notepad, calculator, explorer, cmd, terminal,
 whatsapp, telegram, vscode, visual studio code, excel, word, outlook, paint, spotify.
@@ -43,7 +50,7 @@ Return ONLY valid JSON. No markdown, no explanation.
 ALLOWED_TOOLS = [
     "open_app", "close_window", "find_and_focus",
     "screen_read", "screen_click", "screen_type", "screen_hotkey",
-    "wait_for_approval", "ask_user", "no_op",
+    "wait", "wait_for_approval", "ask_user", "no_op",
 ]
 
 desktop_agent = SubAgentConfig(

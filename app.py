@@ -33,8 +33,11 @@ def _make_tray_icon() -> QIcon:
 
 
 def main() -> None:
-    import os
+    import os, signal
     os.makedirs("data", exist_ok=True)
+
+    # Make Ctrl+C quit the Qt app cleanly instead of just interrupting the main thread
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     # Initialise database
     from storage.database import init_db
@@ -160,34 +163,37 @@ def main() -> None:
             from voice.speech_output import get_speech_output
             from models.provider import get_provider
             _CONV_SYSTEM = (
-                "You are Jarvis, an AI desktop assistant that can control the computer — "
-                "open apps, click, type, browse the web, read files, send messages, and more. "
-                "You CAN interact with the screen. "
-                "When the user says you failed to do something or didn't complete a task, "
-                "apologise briefly and say you will try again — do NOT say you cannot do it. "
-                "Answer in one or two short sentences. Be natural and confident."
+                "You are Jarvis, an AI desktop assistant that CAN control the computer — "
+                "open apps, click, type, browse the web, read files, send messages, and more.\n\n"
+                "IMPORTANT: When the user's message implies performing an action "
+                "(open, search, navigate, click, type, find, etc.) — even if phrased as a "
+                "question, complaint, or casual request — respond ONLY with:\n"
+                "ACTION: <exact task instruction in plain English>\n\n"
+                "Examples:\n"
+                "  'Back on the other end, search YouTube.' → ACTION: open YouTube\n"
+                "  'Why you are not opening the YouTube?' → ACTION: open YouTube\n"
+                "  'Can you search Upwork for me?' → ACTION: search Upwork\n"
+                "  'You didn't click the link.' → ACTION: click on the Upwork link\n\n"
+                "For genuine questions with no action (e.g. 'what time is it?', "
+                "'how are you?'), reply normally in 1-2 short sentences."
             )
             try:
                 provider = get_provider()
-                reply = provider.complete(_CONV_SYSTEM, cmd.text, max_tokens=120)
+                reply = provider.complete(_CONV_SYSTEM, cmd.text, max_tokens=100)
             except Exception:
                 reply = "I'm on it. Let me try that again for you."
             reply = reply.strip()
 
-            # If the user is expressing that a task failed/wasn't done, re-submit it.
-            _RETRY_SIGNALS = (
-                "you have not", "you haven't", "you didn't", "you did not",
-                "not click", "didn't click", "haven't click", "not open", "didn't open",
-                "not search", "not working", "didn't work", "failed to",
-            )
-            t_lower = cmd.text.lower()
-            if any(sig in t_lower for sig in _RETRY_SIGNALS):
-                # Extract what the user wanted by re-submitting the corrected instruction
-                active = orch.active_task()
-                if active and active.status.value in ("completed", "failed", "cancelled"):
-                    task = orch.submit(active.instruction)
-                    reply = f"Sorry about that. Retrying: {active.instruction[:50]}."
-                    dashboard.append_log(f"[Retry] {active.instruction[:60]}")
+            # If LLM detected a task, submit it instead of just speaking
+            if reply.upper().startswith("ACTION:"):
+                task_instruction = reply.split(":", 1)[1].strip().splitlines()[0].strip()
+                task = orch.submit(task_instruction)
+                short = task_instruction[:60]
+                spoken = f"Got it. {short}."
+                get_speech_output().speak(spoken)
+                dashboard.append_log(f"Task submitted: {task.id[:8]} — {short}")
+                avatar.set_state("idle", short)
+                return
 
             get_speech_output().speak(reply)
             dashboard.append_log(f"[Chat] {reply}")

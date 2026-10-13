@@ -24,6 +24,7 @@ Your available tools:
 - screen_read: {} — capture and describe what is currently visible on screen
 - screen_click: {"x": 0, "y": 0} — click at screen coordinates
 - open_app: {"app": "chrome"} — open Chrome if it is not already running
+- wait: {"seconds": 2} — wait N seconds (use after navigation so the page loads)
 - browser_navigate: {"url": "..."} — open URL in automated browser (scraping only)
 - browser_read: {} — read the current automated browser page text
 - ask_user: {"question": "..."} — ask the user a clarifying question
@@ -34,6 +35,16 @@ To open or navigate to any URL in the user's existing Chrome window:
   Step 2 — screen_hotkey {"keys": "ctrl+l"}
   Step 3 — screen_type {"text": "<the full URL>"}
   Step 4 — screen_hotkey {"keys": "enter"}
+  Step 5 — wait {"seconds": 3}   ← ALWAYS wait after pressing enter so the page loads
+  Step 6 — screen_read {}         ← THEN read the screen to verify the page loaded
+
+OWN UI — ALWAYS IGNORE:
+You will see a small floating window on screen labeled "AI Desktop Agent", "AI Agent",
+"Voice Agent", or showing an orb/avatar icon. This is YOUR OWN control panel.
+NEVER try to close it, click its X button, or interact with it in any way.
+Work around it — focus on the application window behind it.
+If a UI element is slightly obscured by it, use keyboard shortcuts instead of clicking
+(e.g. press "/" to focus YouTube search, "Ctrl+L" for Chrome address bar).
 
 NEVER use browser_navigate to open a website the user wants to visit.
 browser_navigate opens an invisible automated browser the user CANNOT see or use.
@@ -56,12 +67,18 @@ a navigation item), ALWAYS insert a screen_read step first to see the current pa
 then add a screen_click step with estimated x/y coordinates of the target element.
 Typical coordinates for the first Google search result link: approximately x=640, y=380.
 
+screen_read RULES:
+- NEVER call screen_read twice in a row. After screen_read you MUST take an action
+  (screen_click, screen_type, screen_hotkey, wait) before reading again.
+- If the screen description seems wrong or unclear, do NOT read again immediately —
+  take a concrete action and then read if needed.
+
 Return ONLY valid JSON. No markdown, no explanation.
 """.strip()
 
 ALLOWED_TOOLS = [
     "web_search", "find_and_focus", "screen_hotkey", "screen_type",
-    "screen_read", "screen_click", "open_app",
+    "screen_read", "screen_click", "open_app", "wait",
     "browser_navigate", "browser_read", "browser_click", "browser_fill",
     "browser_screenshot", "ask_user", "no_op",
 ]

@@ -21,6 +21,12 @@ class LLMProvider(ABC):
     @abstractmethod
     def name(self) -> str: ...
 
+    def complete_with_image(
+        self, system: str, prompt: str, image_b64: str,
+        media_type: str = "image/png", max_tokens: int = 1024,
+    ) -> str:
+        return f"[Vision not supported by {self.name()}]"
+
     def json_complete(self, system: str, user: str, max_tokens: int = 2048) -> Any:
         raw = self.complete(system, user + "\n\nRespond with valid JSON only.", max_tokens)
         try:
@@ -85,6 +91,23 @@ class AnthropicProvider(LLMProvider):
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
+        )
+        return msg.content[0].text
+
+    def complete_with_image(
+        self, system: str, prompt: str, image_b64: str,
+        media_type: str = "image/png", max_tokens: int = 1024,
+    ) -> str:
+        msg = self._client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {
+                    "type": "base64", "media_type": media_type, "data": image_b64,
+                }},
+                {"type": "text", "text": prompt},
+            ]}],
         )
         return msg.content[0].text
 

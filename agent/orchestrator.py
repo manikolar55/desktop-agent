@@ -108,6 +108,13 @@ class Orchestrator:
         if tool == "no_op":
             return "No action taken"
 
+        if tool == "wait":
+            import time as _time
+            seconds = float(params.get("seconds", 2))
+            seconds = min(seconds, 10)  # cap at 10s
+            _time.sleep(seconds)
+            return f"Waited {seconds}s"
+
         if tool == "ask_user":
             return f"[User input required] {step.description}"
 
@@ -253,7 +260,9 @@ class Orchestrator:
         adapter = WindowsAdapter()
 
         if tool == "screen_read":
-            # Capture screenshot, save it, optionally describe via vision
+            import time as _time
+            # 1.5s: page render time + Qt main-thread hide propagation (150ms drain timer)
+            _time.sleep(1.5)
             png = adapter.capture_screen()
             if not png:
                 return "Screen capture not available (pyautogui missing)"
@@ -263,21 +272,26 @@ class Orchestrator:
             with open(path, "wb") as f:
                 f.write(png)
 
-            # Describe using LLM vision if supported
             try:
                 from models.provider import get_provider
                 provider = get_provider()
                 b64 = base64.b64encode(png).decode()
-                desc = provider.complete(
-                    "Describe everything visible on this screenshot in detail: "
-                    "open windows, text content, buttons, and any chat messages.",
-                    f"[image/png base64 length={len(b64)}]",
-                    max_tokens=800,
+                desc = provider.complete_with_image(
+                    "You are an AI desktop agent analyzing a screenshot to decide the next action.",
+                    (
+                        "Describe everything you see on this screenshot precisely:\n"
+                        "- What application/window is in focus (title bar text)\n"
+                        "- The URL shown in the address bar (if a browser is open)\n"
+                        "- Key UI elements visible (search box, buttons, links, text)\n"
+                        "- Approximate screen coordinates (x, y) for important clickable elements\n"
+                        "Be concise but precise. This is used to decide the next click/type action."
+                    ),
+                    b64,
+                    max_tokens=600,
                 )
                 return f"Screen contents:\n{desc}"
-            except Exception:
-                # Fallback: just confirm screenshot was saved
-                return f"Screenshot saved to {path} (vision description unavailable)"
+            except Exception as exc:
+                return f"Screenshot saved to {path} (vision error: {exc})"
 
         if tool == "find_and_focus":
             title = params.get("title", "")

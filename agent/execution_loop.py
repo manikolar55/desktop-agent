@@ -190,6 +190,9 @@ class ExecutionLoop:
         next_step_data = first
         step_index = 0
         _MAX_STEPS = 20
+        _last_tool = None
+        _same_tool_streak = 0
+        _tool_history: list[str] = []  # last N tools for oscillation detection
 
         while next_step_data is not None and step_index < _MAX_STEPS:
             if self._stop_event.is_set() or task.cancelled:
@@ -202,6 +205,42 @@ class ExecutionLoop:
                 task.transition(TaskStatus.FAILED)
                 task_repo.save(task)
                 return task
+
+            # Thrash protection: detect both consecutive repeats and A-B-A-B oscillation
+            current_tool = next_step_data["tool"]
+            if current_tool == _last_tool:
+                _same_tool_streak += 1
+            else:
+                _same_tool_streak = 1
+                _last_tool = current_tool
+            _tool_history.append(current_tool)
+            if len(_tool_history) > 8:
+                _tool_history.pop(0)
+
+            # Tools that are "observation only" — no forward progress on their own
+            _OBS_TOOLS = {"screen_read", "find_and_focus"}
+
+            _thrash = False
+            # 1. Same tool called 3+ times in a row
+            if _same_tool_streak >= 3:
+                _thrash = True
+            # 2. A-B-A-B-A-B oscillation between exactly two tools
+            elif len(_tool_history) >= 6:
+                last6 = _tool_history[-6:]
+                if (last6[0] == last6[2] == last6[4] and last6[1] == last6[3] == last6[5]
+                        and last6[0] != last6[1]):
+                    _thrash = True
+            # 3. Last 5 steps were only observation tools — no real action taken
+            elif len(_tool_history) >= 5:
+                if all(t in _OBS_TOOLS for t in _tool_history[-5:]):
+                    _thrash = True
+
+            if _thrash:
+                log.warning(
+                    "Agentic loop: thrash detected (tool history=%s) — stopping",
+                    _tool_history[-6:],
+                )
+                break
 
             step = TaskStep(
                 index=step_index,
