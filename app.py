@@ -32,6 +32,46 @@ def _make_tray_icon() -> QIcon:
     return QIcon(px)
 
 
+_CLEAN_SYSTEM = (
+    "You are a voice command interpreter for an AI desktop assistant on Windows. "
+    "The user's speech was transcribed by Whisper and may contain errors, repeated words, "
+    "filler phrases, or garbled app names. "
+    "Your job: extract the user's ACTUAL intent as a short, clear computer task instruction.\n\n"
+    "Rules:\n"
+    "- Fix obvious transcription errors: 'Ichon'→'iCloud', 'up work'→'Upwork', "
+    "'you tube'→'YouTube', 'goggle'→'Google', 'chrone'→'Chrome'\n"
+    "- Remove filler: 'for me', 'please', 'I want you to', 'can you', 'that is already open'\n"
+    "- Keep app names, URLs, search terms intact\n"
+    "- If the instruction has repeated sentences, keep only one clean version\n"
+    "- Return ONLY the cleaned instruction — no explanation, no quotes\n\n"
+    "Examples:\n"
+    "  'Open app Ichon from for me and in that window open cloud and select the cloud subscription'"
+    " → 'Open iCloud and select cloud subscription'\n"
+    "  'I open the Chrome browser and in the Chrome browser open terminal and in the terminal search cloud'"
+    " → 'Open Chrome and search Google Cloud Console'\n"
+    "  'The Chrome browser current Chrome browser that is already open open that such the YouTube'"
+    " → 'Open YouTube in Chrome'\n"
+    "  'Open the Chrome browser and search up for a new app open the existing Chrome browser not the new one'"
+    " → 'Search for new apps in existing Chrome window'\n"
+    "  'Search Upwork in the new tab of the browser' → 'Open Upwork in a new Chrome tab'\n"
+)
+
+
+def _clean_instruction(raw: str) -> str:
+    """Fix Whisper transcription errors with Claude before routing/planning."""
+    if len(raw.split()) < 5:
+        return raw  # short commands are usually fine
+    try:
+        from models.provider import get_provider
+        cleaned = get_provider().complete(_CLEAN_SYSTEM, raw, max_tokens=80)
+        cleaned = cleaned.strip().strip('"').strip("'")
+        if cleaned and len(cleaned) > 3:
+            return cleaned
+    except Exception:
+        pass
+    return raw
+
+
 def main() -> None:
     import os, signal
     os.makedirs("data", exist_ok=True)
@@ -207,8 +247,12 @@ def main() -> None:
             return
 
         if cmd.intent.name == "NEW_TASK":
-            task = orch.submit(cmd.task_instruction or text)
-            short = (cmd.task_instruction or text)[:60]
+            raw = cmd.task_instruction or text
+            instruction = _clean_instruction(raw)
+            if instruction != raw:
+                log.info("Instruction cleaned: %r → %r", raw[:60], instruction[:60])
+            task = orch.submit(instruction)
+            short = instruction[:60]
             dashboard.append_log(f"Task submitted: {task.id[:8]} — {short}")
             from voice.speech_output import get_speech_output
             get_speech_output().speak(f"Got it. Working on: {short}")

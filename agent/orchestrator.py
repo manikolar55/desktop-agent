@@ -305,15 +305,55 @@ class Orchestrator:
             app = params.get("app", params.get("executable", ""))
             # Common aliases
             aliases = {
+                # Browsers
                 "chrome": "chrome.exe",
                 "google chrome": "chrome.exe",
+                "firefox": "firefox.exe",
+                "edge": "msedge.exe",
+                "microsoft edge": "msedge.exe",
+                # System
                 "notepad": "notepad.exe",
                 "calculator": "calc.exe",
+                "calc": "calc.exe",
                 "explorer": "explorer.exe",
+                "file explorer": "explorer.exe",
+                "files": "explorer.exe",
                 "cmd": "cmd.exe",
                 "terminal": "cmd.exe",
+                "command prompt": "cmd.exe",
+                "powershell": "powershell.exe",
+                "task manager": "taskmgr.exe",
+                "settings": "ms-settings:",
+                "control panel": "control.exe",
+                "paint": "mspaint.exe",
+                "wordpad": "wordpad.exe",
+                # Office
+                "word": "WINWORD.EXE",
+                "excel": "EXCEL.EXE",
+                "powerpoint": "POWERPNT.EXE",
+                "outlook": "OUTLOOK.EXE",
+                "onenote": "ONENOTE.EXE",
+                # Communication
                 "whatsapp": "whatsapp:",
                 "telegram": "telegram.exe",
+                "discord": "discord.exe",
+                "slack": "slack.exe",
+                "zoom": "zoom.exe",
+                "teams": "teams.exe",
+                "microsoft teams": "teams.exe",
+                "skype": "skype.exe",
+                # Media
+                "spotify": "spotify.exe",
+                "vlc": "vlc.exe",
+                "photos": "ms-photos:",
+                # Dev
+                "vscode": "code.exe",
+                "visual studio code": "code.exe",
+                "vs code": "code.exe",
+                "notepad++": "notepad++.exe",
+                # Apple
+                "icloud": "iCloudPhotos.exe",
+                "ichon": "iCloudPhotos.exe",
             }
             exe = aliases.get(app.lower(), app)
             ok = adapter.open_application(exe)
