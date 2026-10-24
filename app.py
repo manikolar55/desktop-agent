@@ -133,10 +133,77 @@ def main() -> None:
     set_approval_callback(_approval_cb)
 
     # ── Wire signals ──────────────────────────────────────────────────────────
+    _discussion_mode = {"active": False}
+
+    def _start_discussion_mode() -> None:
+        """Record a long discussion then submit to discussion agent."""
+        from voice.input import get_voice_input
+        from voice.speech_output import get_speech_output
+        vi = get_voice_input()
+        tts = get_speech_output()
+
+        if _discussion_mode["active"]:
+            tts.speak("Discussion mode is already active.")
+            return
+
+        _discussion_mode["active"] = True
+        tts.speak("Discussion mode started. Speak now. I'll stop after 4 seconds of silence.")
+        avatar.set_state("running", "Listening to discussion...")
+
+        def _record():
+            transcript = vi.listen_long(max_duration=300, silence_after_speech=4.0)
+            _discussion_mode["active"] = False
+            if not transcript:
+                tts.speak("I didn't catch anything. Try again.")
+                avatar.set_state("idle", "")
+                return
+            log.info("Discussion transcript (%d chars): %s…", len(transcript), transcript[:80])
+            tts.speak("Got it. Processing your discussion.")
+            task = orch.submit(f"[Discussion transcript] {transcript}")
+            dashboard.append_log(f"Discussion submitted: {task.id[:8]}")
+
+        import threading
+        threading.Thread(target=_record, daemon=True, name="DiscussionRecorder").start()
+
     def _handle_instruction(text: str) -> None:
+        from voice import language as lang_mod
         from voice.commands import parse_command, CommandIntent
+
+        lang = lang_mod.detect_text_language(text, hint=lang_mod.voice_hint(text))
+        lang_mod.set_reply_language(lang)
+        if lang != "en":
+            from config.settings import get_settings
+            english, lang = lang_mod.to_english(text, lang, refine=get_settings().voice_language == "auto")
+            lang_mod.set_reply_language(lang)
+            log.info("Language %s: %r → %r", lang, text[:60], english[:60])
+            if english.strip(" .!").upper() == "UNCLEAR":
+                from voice.speech_output import get_speech_output
+                get_speech_output().speak("Sorry, I couldn't understand that. Please say it again.")
+                dashboard.append_log(f"[?] Unclear {lang_mod.LANGUAGE_NAMES[lang]} input: {text[:50]}")
+                return
+            dashboard.append_log(f"[{lang_mod.LANGUAGE_NAMES[lang]}] {text}  →  {english}")
+            text = english
+
+        from agent import feedback
+        last_task = next((t for t in orch.recent_tasks(5) if t.metadata.get("agent")), None)
+        fb_reply = feedback.handle(text, last_task)
+        if fb_reply:
+            from voice.speech_output import get_speech_output
+            get_speech_output().speak(fb_reply)
+            dashboard.append_log(f"[Learning] {fb_reply}")
+            return
+
         cmd = parse_command(text)
         log.info("Command: intent=%s text=%s", cmd.intent.value, text)
+
+        # Discussion mode trigger
+        _DISCUSSION_TRIGGERS = (
+            "discussion mode", "start discussion", "listen to discussion",
+            "take notes on", "note this", "start listening", "record discussion",
+        )
+        if any(tr in text.lower() for tr in _DISCUSSION_TRIGGERS):
+            _start_discussion_mode()
+            return
 
         if cmd.intent.name == "STOP_EVERYTHING":
             n = orch.emergency_stop()
@@ -213,7 +280,12 @@ def main() -> None:
                 "  'Back on the other end, search YouTube.' → ACTION: open YouTube\n"
                 "  'Why you are not opening the YouTube?' → ACTION: open YouTube\n"
                 "  'Can you search Upwork for me?' → ACTION: search Upwork\n"
-                "  'You didn't click the link.' → ACTION: click on the Upwork link\n\n"
+                "  'You didn't click the link.' → ACTION: click on the Upwork link\n"
+                "  'Which project do I have open in PyCharm?' → ACTION: look at the screen and tell me which project is open in PyCharm\n"
+                "  'Can you see my screen? What am I doing?' → ACTION: look at the screen and tell me what I am doing\n"
+                "  'Why can't you tell me which project I opened?' → ACTION: look at the screen and tell me which project is open\n\n"
+                "You CAN see the screen — never say you cannot see it. Any question about what is on the "
+                "screen, which window/app/project is open, or what the user is doing is an ACTION.\n\n"
                 "For genuine questions with no action (e.g. 'what time is it?', "
                 "'how are you?'), reply normally in 1-2 short sentences."
             )
@@ -248,6 +320,12 @@ def main() -> None:
 
         if cmd.intent.name == "NEW_TASK":
             raw = cmd.task_instruction or text
+            words = [w for w in raw.strip(" .!?,").split() if w]
+            if len(words) < 2 and raw.strip(" .!?,").lower() not in {"screenshot", "minimize", "maximize", "scroll"}:
+                from voice.speech_output import get_speech_output
+                get_speech_output().speak("Sorry, I only caught one word. Please say the full command.")
+                dashboard.append_log(f"[?] Ignored one-word input: {raw[:30]}")
+                return
             instruction = _clean_instruction(raw)
             if instruction != raw:
                 log.info("Instruction cleaned: %r → %r", raw[:60], instruction[:60])
@@ -337,6 +415,11 @@ def main() -> None:
 
     # ── Start orchestrator worker ─────────────────────────────────────────────
     orch.start()
+
+    # ── Start file system indexer (background) ────────────────────────────────
+    from tools.file_indexer import get_indexer
+    get_indexer().start()
+    log.info("File system indexer started")
 
     # ── Show UI ───────────────────────────────────────────────────────────────
     avatar.show()

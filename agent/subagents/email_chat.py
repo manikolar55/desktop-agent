@@ -26,6 +26,7 @@ Your available tools:
 - screen_hotkey: {"keys": "ctrl+enter"} — keyboard shortcuts (e.g., send email/message)
 - google_chat_read: {} — read Google Chat messages
 - google_chat_reply: {"message": "...", "thread_id": "..."} — reply in Google Chat
+- wait: {"seconds": 2} — wait N seconds (use after open_app or navigating so the page loads)
 - ask_user: {"question": "..."} — ask the user for message content or recipient
 - wait_for_approval: {} — pause for user approval before sending
 
@@ -43,7 +44,7 @@ Return ONLY valid JSON. No markdown, no explanation.
 ALLOWED_TOOLS = [
     "open_app", "find_and_focus", "screen_read", "screen_click",
     "screen_type", "screen_hotkey", "google_chat_read", "google_chat_reply",
-    "ask_user", "wait_for_approval", "no_op",
+    "wait", "ask_user", "wait_for_approval", "no_op",
 ]
 
 email_chat_agent = SubAgentConfig(

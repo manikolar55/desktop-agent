@@ -25,11 +25,17 @@ Your available tools:
 - screen_click: {"x": 0, "y": 0, "button": "left"} — click at screen coordinates
 - screen_type: {"text": "..."} — type text at the current cursor position
 - screen_hotkey: {"keys": "ctrl+c"} — press a keyboard shortcut
+- screen_ask: {"question": "..."} — look at the screen and SPEAK the answer to a question about it
 - wait: {"seconds": 2} — pause N seconds (use after open_app so the app has time to load)
 - wait_for_approval: {} — pause and request user approval before continuing
 - ask_user: {"question": "..."} — ask the user a clarifying question
 
 RULES:
+- QUESTIONS ABOUT THE SCREEN ("what is on my screen", "which project is open in <editor>",
+  "what am I doing", "what app is this", "read my screen"): use exactly ONE step —
+  screen_ask {"question": "<the user's question, cleaned up>"}. It looks at the screen and speaks
+  the answer itself. NEVER open or launch apps to answer such a question, even if the user names
+  an app that is not visible; screen_ask will say which app is actually showing.
 - Always call find_and_focus BEFORE screen_click or screen_type in a specific window.
 - Use screen_read to verify the current screen state before taking action.
 - NEVER call screen_read twice in a row — after screen_read you MUST take a concrete
@@ -49,7 +55,7 @@ Return ONLY valid JSON. No markdown, no explanation.
 
 ALLOWED_TOOLS = [
     "open_app", "close_window", "find_and_focus",
-    "screen_read", "screen_click", "screen_type", "screen_hotkey",
+    "screen_read", "screen_ask", "screen_click", "screen_type", "screen_hotkey",
     "wait", "wait_for_approval", "ask_user", "no_op",
 ]
 

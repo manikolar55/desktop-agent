@@ -20,7 +20,22 @@
       "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\Pcomputer\\\\Desktop\\\\desktop-agent\\\\agent\\\\subagents\")",
       "Bash(Out-Null)",
       "Bash(Write-Host \"done\")",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 python live_test.py voice_qa explorer desktop)",
+      "Bash(grep -v \"^$\")",
+      "Bash(PYTHONIOENCODING=utf-8 python live_test.py youtube)",
+      "Bash(sed -n '/LIVE EXECUTION/,$p' live_youtube2.log)",
+      "Bash(PYTHONIOENCODING=utf-8 python live_test.py screen_qa screen_qa2)",
+      "Bash(sed -n '/LIVE EXECUTION/,$p' live_screen.log)",
+      "Bash(PYTHONIOENCODING=utf-8 python -)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(pip uninstall *)",
+      "Bash(PYTHONIOENCODING=utf-8 python data/_live_lang.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python data/_live_e2e.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python live_test.py explorer desktop)",
+      "Bash(PYTHONIOENCODING=utf-8 python live_test.py screen_qa2 youtube)"
     ]
   }
 }

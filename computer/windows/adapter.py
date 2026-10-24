@@ -136,8 +136,18 @@ class WindowsAdapter(ComputerControlProvider):
             ]
             for c in candidates:
                 if os.path.exists(c):
-                    executable = c
+                    executable = f'"{c}"'
                     break
+            # Launch straight into the last-used profile so Chrome doesn't show "Who's using Chrome?".
+            try:
+                import json
+                state = os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\User Data\Local State")
+                with open(state, encoding="utf-8") as f:
+                    profile = json.load(f).get("profile", {}).get("last_used")
+                if profile:
+                    executable += f' --profile-directory="{profile}"'
+            except Exception as exc:
+                log.debug("Could not read Chrome last-used profile: %s", exc)
         try:
             subprocess.Popen(executable, shell=True)
             return True

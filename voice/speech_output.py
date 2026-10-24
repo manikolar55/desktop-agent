@@ -40,15 +40,33 @@ class SpeechOutput:
         except ImportError:
             pass
 
+        # pyttsx3's runAndWait() returns instantly without speaking on every call after
+        # the first on Windows, so prefer the SAPI voice directly (blocking Speak).
+        sapi_voice = None
+        if _com_ok:
+            try:
+                import win32com.client
+                sapi_voice = win32com.client.Dispatch("SAPI.SpVoice")
+                sapi_voice.Rate = 1
+                sapi_voice.Volume = 100
+            except Exception as exc:
+                log.warning("SAPI direct init failed (%s) — falling back to pyttsx3", exc)
+                sapi_voice = None
+
+        engine = None
         try:
-            import pyttsx3
-            engine = pyttsx3.init()
-            engine.setProperty("rate", 160)
-            engine.setProperty("volume", 1.0)
-            self._available = True
-            log.info("TTS engine ready (COM=%s)", _com_ok)
+            if sapi_voice is not None:
+                self._available = True
+                log.info("TTS engine ready (SAPI direct, COM=%s)", _com_ok)
+            else:
+                import pyttsx3
+                engine = pyttsx3.init()
+                engine.setProperty("rate", 160)
+                engine.setProperty("volume", 1.0)
+                self._available = True
+                log.info("TTS engine ready (pyttsx3, COM=%s)", _com_ok)
         except Exception as exc:
-            log.warning("pyttsx3 init failed: %s — TTS disabled", exc)
+            log.warning("TTS init failed: %s — TTS disabled", exc)
             while True:
                 item = self._q.get()
                 if item is _STOP_SENTINEL:
@@ -72,8 +90,13 @@ class SpeechOutput:
                 try:
                     self._speaking.set()
                     log.info("TTS playing: %r", text[:60])
-                    engine.say(text)
-                    engine.runAndWait()
+                    if self._speak_localized(text):
+                        pass
+                    elif sapi_voice is not None:
+                        sapi_voice.Speak(text)
+                    else:
+                        engine.say(text)
+                        engine.runAndWait()
                     log.info("TTS done")
                 except Exception as exc:
                     log.error("TTS error: %s", exc)
@@ -86,6 +109,24 @@ class SpeechOutput:
                     pythoncom.CoUninitialize()
                 except Exception:
                     pass
+
+    @staticmethod
+    def _speak_localized(text: str) -> bool:
+        """Speak `text` in the current reply language (Urdu/Punjabi). False = caller should use English SAPI."""
+        from voice import language, tts_online
+        lang = language.get_reply_language()
+        if lang == "en" or not tts_online.available():
+            return False
+        try:
+            translated = language.from_english(language.shorten_for_speech(text), lang)
+            if not translated:
+                return False
+            log.info("TTS [%s]: %r", lang, translated[:60])
+            tts_online.speak(translated, lang)
+            return True
+        except Exception as exc:
+            log.warning("Localized TTS failed (%s) — falling back to English", exc)
+            return False
 
     def speak(self, text: str) -> None:
         if not text:
@@ -103,6 +144,8 @@ class SpeechOutput:
         self._q.put(text)
 
     def stop(self) -> None:
+        from voice import tts_online
+        tts_online.stop_playback()
         with self._queued_lock:
             try:
                 while True:

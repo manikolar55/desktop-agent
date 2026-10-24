@@ -159,6 +159,23 @@ class Orchestrator:
                     "open_app", "find_and_focus", "screen_hotkey", "close_window"):
             return self._tool_computer(tool, params, task)
 
+        if tool == "speak_answer":
+            return self._tool_speak_answer(params)
+
+        if tool == "screen_ask":
+            return self._tool_screen_ask(params)
+
+        if tool == "file_search":
+            return self._tool_file_search(params)
+
+        if tool == "file_open":
+            return self._tool_file_open(params)
+
+        if tool == "file_index_rebuild":
+            from tools.file_indexer import get_indexer
+            get_indexer().rebuild()
+            return "File index rebuild started in background — will complete in ~30 seconds"
+
         return f"Unknown tool '{tool}' — skipped"
 
     def _tool_web_search(self, params: dict) -> str:
@@ -267,27 +284,44 @@ class Orchestrator:
             if not png:
                 return "Screen capture not available (pyautogui missing)"
 
-            import os, base64
+            import os, base64, io
             path = "data/screenshot_latest.png"
             with open(path, "wb") as f:
                 f.write(png)
+
+            # The vision model reports coordinates in the image it receives, so send a
+            # fixed-size image and remember the factor needed to map clicks to real pixels.
+            from PIL import Image
+            full = Image.open(io.BytesIO(png))
+            send_w = 1280
+            send_h = round(full.height * send_w / full.width)
+            self._shot_scale = full.width / send_w
+            buf = io.BytesIO()
+            full.convert("RGB").resize((send_w, send_h), Image.LANCZOS).save(buf, format="JPEG", quality=80)
+            png = buf.getvalue()
 
             try:
                 from models.provider import get_provider
                 provider = get_provider()
                 b64 = base64.b64encode(png).decode()
                 desc = provider.complete_with_image(
-                    "You are an AI desktop agent analyzing a screenshot to decide the next action.",
+                    "You are an AI desktop agent analyzing a screenshot to decide the next click or type action.",
                     (
-                        "Describe everything you see on this screenshot precisely:\n"
-                        "- What application/window is in focus (title bar text)\n"
-                        "- The URL shown in the address bar (if a browser is open)\n"
-                        "- Key UI elements visible (search box, buttons, links, text)\n"
-                        "- Approximate screen coordinates (x, y) for important clickable elements\n"
-                        "Be concise but precise. This is used to decide the next click/type action."
+                        f"This screenshot is exactly {send_w}x{send_h} pixels. All coordinates you give "
+                        f"must be in this {send_w}x{send_h} pixel space.\n"
+                        "Describe what you see on this screenshot. Be precise and concise:\n"
+                        "1. Active window/app name (read the title bar)\n"
+                        "2. URL in address bar (if visible — copy it exactly)\n"
+                        "3. For each important UI element (buttons, links, input boxes, search bars, tabs):\n"
+                        "   - Its label/text\n"
+                        "   - Exact pixel coordinates: (x, y) where x=0 is left edge, y=0 is top edge\n"
+                        "   Example: 'Search box at (640, 45)', 'Submit button at (820, 510)'\n"
+                        "4. Any error messages or dialogs visible\n"
+                        "Focus on elements the agent may need to click or type into next."
                     ),
                     b64,
-                    max_tokens=600,
+                    media_type="image/jpeg",
+                    max_tokens=500,
                 )
                 return f"Screen contents:\n{desc}"
             except Exception as exc:
@@ -360,8 +394,9 @@ class Orchestrator:
             return f"Opened '{exe}'" if ok else f"Failed to open '{exe}'"
 
         if tool == "screen_click":
-            x = int(params.get("x", 0))
-            y = int(params.get("y", 0))
+            scale = getattr(self, "_shot_scale", 1.0)
+            x = int(int(params.get("x", 0)) * scale)
+            y = int(int(params.get("y", 0)) * scale)
             btn = params.get("button", "left")
             adapter.click_mouse(x, y, btn)
             return f"Clicked {btn} at ({x}, {y})"
@@ -408,6 +443,92 @@ class Orchestrator:
             return "close_window: no matching window found"
 
         return f"Unknown computer tool: {tool}"
+
+    def _tool_screen_ask(self, params: dict) -> str:
+        """Answer a question about what is on screen (screenshot + open window titles) and speak it."""
+        import base64, io, time as _time
+        from computer.windows.adapter import WindowsAdapter
+        question = params.get("question", "").strip() or "What is on my screen right now?"
+        adapter = WindowsAdapter()
+        _time.sleep(1.0)
+        png = adapter.capture_screen()
+        if not png:
+            return "Screen capture not available (pyautogui missing)"
+
+        from PIL import Image
+        full = Image.open(io.BytesIO(png))
+        send_w = 1280
+        send_h = round(full.height * send_w / full.width)
+        buf = io.BytesIO()
+        full.resize((send_w, send_h), Image.LANCZOS).save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+
+        titles = [w.title for w in adapter.list_windows()
+                  if not any(s in w.title for s in ("AI Desktop Agent", "Program Manager"))]
+        titles_text = "\n".join(f"- {t[:120]}" for t in titles[:25]) or "(unavailable)"
+
+        from models.provider import get_provider
+        answer = get_provider().complete_with_image(
+            "You answer questions about the user's computer screen for a voice assistant. "
+            "Be accurate and brief: 1-3 plain spoken sentences, no markdown, no coordinates. "
+            "Use the open window titles as hard evidence (editor titles usually contain the "
+            "project name). If the user names an app that is not open, say so and say which "
+            "app is actually showing.",
+            f"Open window titles:\n{titles_text}\n\nUser question: {question}",
+            b64,
+            max_tokens=250,
+        ).strip()
+        try:
+            from voice.speech_output import get_speech_output
+            get_speech_output().speak(answer)
+        except Exception as exc:
+            log.warning("screen_ask TTS failed: %s", exc)
+        return answer
+
+    def _tool_speak_answer(self, params: dict) -> str:
+        answer = params.get("answer", "").strip()
+        if not answer:
+            return "No answer provided"
+        try:
+            from voice.speech_output import get_speech_output
+            get_speech_output().speak(answer)
+        except Exception as exc:
+            log.warning("speak_answer TTS failed: %s", exc)
+        return answer
+
+    def _tool_file_search(self, params: dict) -> str:
+        from tools.file_indexer import get_indexer
+        indexer = get_indexer()
+        if not indexer.is_ready():
+            return "File index is still building — please try again in a few seconds"
+        query = params.get("query", "").strip()
+        if not query:
+            return "No search query provided"
+        results = indexer.search(query)
+        if not results:
+            stats = indexer.stats()
+            return (
+                f"No files found matching '{query}'. "
+                f"Index has {stats['filenames_indexed']} filenames. "
+                "Try a shorter or different term, or use file_index_rebuild to rescan."
+            )
+        lines = [f"Found {len(results)} file(s) matching '{query}':"]
+        for r in results:
+            lines.append(f"  {r['name']}  →  {r['path']}")
+        return "\n".join(lines)
+
+    def _tool_file_open(self, params: dict) -> str:
+        import os
+        path = params.get("path", "").strip()
+        if not path:
+            return "No path provided"
+        if not os.path.exists(path):
+            return f"File not found: {path}"
+        try:
+            os.startfile(path)
+            return f"Opened: {path}"
+        except Exception as exc:
+            return f"Failed to open '{path}': {exc}"
 
     def _tool_upwork(self, tool: str, params: dict, task: Task) -> str:
         from workflows.job_research import upwork_tool

@@ -50,6 +50,8 @@ class ExecutionLoop:
             return task
 
     def _run_task(self, task: Task, config=None) -> Task:
+        if config:
+            task.metadata["agent"] = config.name
         if config and getattr(config, "agentic", False):
             return self._run_task_agentic(task, config)
 
@@ -225,22 +227,28 @@ class ExecutionLoop:
             if _same_tool_streak >= 3:
                 _thrash = True
             # 2. A-B-A-B-A-B oscillation between exactly two tools
-            elif len(_tool_history) >= 6:
+            if len(_tool_history) >= 6:
                 last6 = _tool_history[-6:]
                 if (last6[0] == last6[2] == last6[4] and last6[1] == last6[3] == last6[5]
                         and last6[0] != last6[1]):
                     _thrash = True
             # 3. Last 5 steps were only observation tools — no real action taken
-            elif len(_tool_history) >= 5:
-                if all(t in _OBS_TOOLS for t in _tool_history[-5:]):
-                    _thrash = True
+            if len(_tool_history) >= 5 and all(t in _OBS_TOOLS for t in _tool_history[-5:]):
+                _thrash = True
+            # 4. Many screenshots without finishing — the task is probably not doable as phrased
+            if sum(1 for s in task.steps if s.tool == "screen_read") >= 8:
+                _thrash = True
 
             if _thrash:
                 log.warning(
                     "Agentic loop: thrash detected (tool history=%s) — stopping",
                     _tool_history[-6:],
                 )
-                break
+                task.error_message = "I got stuck and could not finish that."
+                task.transition(TaskStatus.FAILED)
+                task_repo.save(task)
+                self._notify(task)
+                return task
 
             step = TaskStep(
                 index=step_index,
@@ -271,6 +279,21 @@ class ExecutionLoop:
             step_index += 1
             next_step_data = plan_next_step(task.instruction, completed, config=config)
 
+        if next_step_data is not None:
+            task.error_message = "I ran out of steps before finishing that."
+            task.transition(TaskStatus.FAILED)
+            task_repo.save(task)
+            self._notify(task)
+            return task
+
+        try:
+            from agent.learning import record_success
+            record_success(
+                task.instruction, config.name,
+                [{"tool": s.tool, "description": s.description, "parameters": s.parameters} for s in task.steps],
+            )
+        except Exception as exc:
+            log.debug("Could not record recipe: %s", exc)
         task.add_history("verified", f"Agentic loop completed {step_index} steps")
         task.result["summary"] = f"Completed {step_index} steps"
         task.transition(TaskStatus.COMPLETED)

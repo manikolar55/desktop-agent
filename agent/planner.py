@@ -85,6 +85,13 @@ When a screen_read step has been completed and its result describes the screen,
 read that description carefully and use the ACTUAL positions of elements when
 choosing screen_click coordinates. Never guess — use what screen_read reported.
 
+PACING RULES — always add a wait step after these actions:
+- open_app → wait {"seconds": 2} before interacting with the app
+- screen_hotkey {"keys": "enter"} after typing a URL → wait {"seconds": 3} for page to load
+- browser_navigate → wait {"seconds": 2} for page to load
+
+NEVER call screen_read twice in a row — always take a concrete action first.
+
 Return ONLY valid JSON. No markdown, no explanation.
 """
 
@@ -104,10 +111,21 @@ def plan_next_step(
     allowed = set(config.allowed_tools) if config and config.allowed_tools else None
 
     lines = [f"User instruction: {instruction}"]
+    if config:
+        try:
+            from agent.learning import hints_for
+            hints = hints_for(instruction, config.name)
+            if hints:
+                lines.append("\n" + hints.rstrip())
+        except Exception as exc:
+            log.debug("Learning hints unavailable: %s", exc)
     if completed_steps:
         lines.append("\nSteps completed so far:")
-        for s in completed_steps:
-            result_preview = (s.get("result") or s.get("error") or "")[:500]
+        for i, s in enumerate(completed_steps):
+            raw = (s.get("result") or s.get("error") or "")
+            # Give screen_read results more room — they contain coordinates the agent needs
+            limit = 1200 if s.get("tool") == "screen_read" else 600
+            result_preview = raw[:limit]
             lines.append(f'  [{s["tool"]}] {s["description"]}\n    Result: {result_preview}')
         lines.append('\nWhat is the NEXT step? (or {"done": true} if complete)')
     else:

@@ -27,6 +27,7 @@ Your available tools:
 - screen_read: {} — capture and describe what is currently on screen
 - screen_type: {"text": "..."} — type text into a focused document
 - screen_hotkey: {"keys": "ctrl+s"} — keyboard shortcuts (e.g., save)
+- wait: {"seconds": 2} — wait N seconds (use after opening an app)
 - ask_user: {"question": "..."} — ask for the file path or additional details
 - wait_for_approval: {} — pause for user approval before writing
 
@@ -43,7 +44,7 @@ Return ONLY valid JSON. No markdown, no explanation.
 ALLOWED_TOOLS = [
     "file_read", "file_write", "summarize", "draft_document", "shell_run",
     "find_and_focus", "screen_read", "screen_type", "screen_hotkey",
-    "ask_user", "wait_for_approval", "no_op",
+    "wait", "ask_user", "wait_for_approval", "no_op",
 ]
 
 file_docs_agent = SubAgentConfig(

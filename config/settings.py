@@ -29,6 +29,8 @@ class AppSettings(BaseSettings):
     # ── Voice ────────────────────────────────────────────────────────────────
     voice_input_provider: Literal["faster_whisper", "whisper_api", "disabled"] = "disabled"
     whisper_model_size: Literal["tiny", "base", "small", "medium", "large"] = "base"
+    mic_device: str = ""  # sounddevice index or name; empty = Windows default
+    voice_language: Literal["auto", "en", "ur", "pa"] = "auto"  # auto = detect English/Urdu/Punjabi per utterance
     voice_output_provider: Literal["pyttsx3", "elevenlabs", "disabled"] = "pyttsx3"
     elevenlabs_api_key: str = ""
 
