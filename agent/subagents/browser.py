@@ -23,6 +23,7 @@ Your available tools:
 - screen_type: {"text": "..."} — type text (URL or search term)
 - screen_read: {} — capture and describe what is currently visible on screen
 - screen_click: {"x": 0, "y": 0} — click at screen coordinates
+- screen_ask: {"question": "..."} — look at the screen and SPEAK the answer to a question about it
 - open_app: {"app": "chrome"} — open Chrome if it is not already running
 - wait: {"seconds": 2} — wait N seconds (use after navigation so the page loads)
 - browser_navigate: {"url": "..."} — open URL in automated browser (scraping only)
@@ -32,6 +33,15 @@ Your available tools:
 CHROME IS USUALLY ALREADY OPEN. ALWAYS start with find_and_focus {"title": "Chrome"}.
 Use open_app only if find_and_focus reports no matching window. Launching chrome.exe a second
 time pops up the "Who's using Chrome?" profile picker and wastes many steps.
+
+QUESTIONS ABOUT WHAT IS OPEN ("what tab is open", "what is this page", "what is Chrome showing",
+"what is that tab doing", "read this page to me"): the user wants to HEAR an answer, so
+screen_read alone is useless (nobody hears it). Do exactly: find_and_focus {"title": "Chrome"},
+then screen_ask {"question": "<the user's question, cleaned up>"}. Do NOT navigate anywhere and
+do NOT open new pages. After screen_ask the task is done.
+Even if the instruction starts with "Open Chrome and check/tell me ...", the FIRST step is still
+find_and_focus, never open_app: opening Chrome again would replace the tab the user is asking about
+with a blank "New tab". Only call open_app if find_and_focus says no Chrome window was found.
 
 URL NAVIGATION RULES — FOLLOW EXACTLY EVERY TIME:
 To open or navigate to any URL in the user's existing Chrome window:
@@ -99,7 +109,7 @@ Return ONLY valid JSON. No markdown, no explanation.
 
 ALLOWED_TOOLS = [
     "web_search", "find_and_focus", "screen_hotkey", "screen_type",
-    "screen_read", "screen_click", "open_app", "wait",
+    "screen_read", "screen_ask", "screen_click", "open_app", "wait",
     "browser_navigate", "browser_read", "browser_click", "browser_fill",
     "browser_screenshot", "ask_user", "no_op",
 ]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -42,6 +43,7 @@ class FileIndexer:
         self._lock = threading.RLock()
         self._ready = False
         self._scanning = False
+        self._norm_cache: tuple[int, list[tuple[str, str]]] | None = None
 
     def start(self) -> None:
         self._load_from_disk()
@@ -70,7 +72,9 @@ class FileIndexer:
 
     def _background_loop(self) -> None:
         while True:
+            self._warm()
             self._rebuild()
+            self._warm()
             time.sleep(REBUILD_INTERVAL)
 
     def _rebuild(self) -> None:
@@ -129,10 +133,9 @@ class FileIndexer:
                 for fname in filenames:
                     key = fname.lower()
                     full = os.path.join(dirpath, fname)
-                    if key not in index:
-                        index[key] = [full]
-                    else:
-                        index[key].append(full)
+                    paths = index.setdefault(key, [])
+                    if full not in paths:
+                        paths.append(full)
         except PermissionError:
             pass
         except Exception as exc:
@@ -178,6 +181,9 @@ class FileIndexer:
                 if len(results) >= max_results * 2:
                     break
 
+        if not results:
+            return self._token_search(q, max_results)
+
         # Sort: priority folders first, then by path length (shorter = more accessible)
         priority_roots = [str(f).lower() for f in _PRIORITY_FOLDERS if f.exists()]
 
@@ -189,6 +195,30 @@ class FileIndexer:
         results.sort(key=_rank)
         return results[:max_results]
 
+    def _warm(self) -> list[tuple[str, str]]:
+        """Build (normalised path, path) lookup once per index version, outside the search path."""
+        with self._lock:
+            cache = self._norm_cache
+            if cache is not None and cache[0] == len(self._index):
+                return cache[1]
+            paths = [p for ps in self._index.values() for p in set(ps)]
+            size = len(self._index)
+        built = [(_norm(p), p) for p in paths]
+        with self._lock:
+            self._norm_cache = (size, built)
+        return built
+
+    def _token_search(self, q: str, max_results: int) -> list[dict]:
+        """Match every meaningful word of the query anywhere in the full path (folder names count)."""
+        tokens = [t for t in _norm(q).split() if t not in _STOPWORDS]
+        if not tokens:
+            return []
+        haystack = self._warm()
+        hits = [p for n, p in haystack if all(t in n for t in tokens)]
+        # Files whose own name contains every word beat files that only sit in a matching folder
+        hits.sort(key=lambda p: (not all(t in _norm(os.path.basename(p)) for t in tokens), len(p)))
+        return [_entry(p) for p in hits[:max_results]]
+
     def is_ready(self) -> bool:
         return self._ready
 
@@ -199,6 +229,15 @@ class FileIndexer:
     def stats(self) -> dict:
         with self._lock:
             return {"filenames_indexed": len(self._index), "ready": self._ready, "scanning": self._scanning}
+
+
+_STOPWORDS = {
+    "and", "the", "a", "an", "of", "my", "movie", "film", "file", "folder", "video", "from", "in",
+}
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
 
 
 def _entry(path: str) -> dict:

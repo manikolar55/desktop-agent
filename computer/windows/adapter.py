@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
 from typing import Optional
 
 from computer.base import ComputerControlProvider, WindowInfo
@@ -75,23 +76,23 @@ class WindowsAdapter(ComputerControlProvider):
             return False
         try:
             hwnd = window.hwnd
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-            # Windows blocks SetForegroundWindow unless we share the foreground thread.
-            try:
-                import win32process
-                import win32api
-                fg = win32gui.GetForegroundWindow()
-                fg_tid = win32process.GetWindowThreadProcessId(fg)[0]
-                my_tid = win32api.GetCurrentThreadId()
-                if fg_tid and fg_tid != my_tid:
-                    win32process.AttachThreadInput(fg_tid, my_tid, True)
+            if win32gui.IsIconic(hwnd):
+                win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            for _ in range(3):
+                # A tap of Alt lets this process take the foreground; Windows otherwise refuses.
+                import ctypes
+                ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
+                ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
+                try:
+                    win32gui.BringWindowToTop(hwnd)
                     win32gui.SetForegroundWindow(hwnd)
-                    win32process.AttachThreadInput(fg_tid, my_tid, False)
-                else:
-                    win32gui.SetForegroundWindow(hwnd)
-            except Exception:
-                win32gui.SetForegroundWindow(hwnd)
-            return True
+                except Exception as exc:
+                    log.debug("SetForegroundWindow attempt failed: %s", exc)
+                time.sleep(0.15)
+                if win32gui.GetForegroundWindow() == hwnd:
+                    return True
+            log.warning("focus_window: '%s' did not come to the foreground", window.title)
+            return False
         except Exception as exc:
             log.error("focus_window failed: %s", exc)
             # Fallback: use pyautogui to click the window's title bar

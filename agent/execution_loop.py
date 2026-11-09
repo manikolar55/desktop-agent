@@ -157,7 +157,7 @@ class ExecutionLoop:
         completed: list[dict] = []
 
         # First step also carries risk/approval metadata
-        first = plan_next_step(task.instruction, [], config=config)
+        first = plan_next_step(task.instruction, [], config=config, context=task.metadata.get("context"))
         if first is None:
             task.objective = task.instruction
             task.result["summary"] = "Nothing to do"
@@ -277,7 +277,7 @@ class ExecutionLoop:
                 return task
 
             step_index += 1
-            next_step_data = plan_next_step(task.instruction, completed, config=config)
+            next_step_data = plan_next_step(task.instruction, completed, config=config, context=task.metadata.get("context"))
 
         if next_step_data is not None:
             task.error_message = "I ran out of steps before finishing that."
@@ -288,10 +288,11 @@ class ExecutionLoop:
 
         try:
             from agent.learning import record_success
-            record_success(
-                task.instruction, config.name,
-                [{"tool": s.tool, "description": s.description, "parameters": s.parameters} for s in task.steps],
-            )
+            if not task.metadata.get("followup"):
+                record_success(
+                    task.instruction, config.name,
+                    [{"tool": s.tool, "description": s.description, "parameters": s.parameters} for s in task.steps],
+                )
         except Exception as exc:
             log.debug("Could not record recipe: %s", exc)
         task.add_history("verified", f"Agentic loop completed {step_index} steps")

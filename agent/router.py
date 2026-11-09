@@ -76,6 +76,23 @@ Examples:
 "What did I say?" → discussion
 """.strip()
 
+_FOLLOWUP_SYSTEM = """
+You decide whether a new instruction CONTINUES the previous task or is an independent NEW task.
+FOLLOWUP: it refers to what the previous task left open or found ("it", "that", "the first one",
+"now scroll", "click the second result", "and what is it doing now", "go back", "do the same for...")
+or clearly needs the same page/app/window to already be in the state the previous task left it.
+NEW: it names a different app, site, file or topic, asks a general knowledge question, or makes
+sense completely on its own ("open Notepad", "what is the capital of France", "find my CV").
+Reply with ONLY one word: FOLLOWUP or NEW.
+
+Examples:
+Previous: Open YouTube and search songs -> "Play the first video" = FOLLOWUP
+Previous: Open Chrome and check the tab -> "Now scroll down and tell me more" = FOLLOWUP
+Previous: Open Chrome and check the tab -> "Open Notepad" = NEW
+Previous: Open YouTube and search songs -> "What is the capital of France" = NEW
+Previous: Open Upwork -> "Search for python jobs" = FOLLOWUP
+""".strip()
+
 # Keywords used when Claude API is unavailable
 _SYSTEM_EXPLORER_KW = (
     "where is", "where is my", "find file", "find the file", "find my",
@@ -153,6 +170,34 @@ class Router:
         config = _AGENTS.get(agent_type, desktop_agent)
         log.info("Router: [%s] → %s", instruction[:70], config.name)
         return config
+
+    def config_for(self, agent_name: str) -> SubAgentConfig:
+        return _AGENTS.get(agent_name, desktop_agent)
+
+    def is_followup(self, instruction: str, prev) -> bool:
+        """True if `instruction` continues the previous task's state instead of starting a new one."""
+        from agent.session import looks_like_followup
+
+        if self._ready and self._client:
+            findings = "; ".join(prev.findings)[:500] or "(none)"
+            prompt = (
+                f"Previous task: {prev.instruction}\n"
+                f"What it left on screen: {findings}\n"
+                f"New instruction: {instruction}"
+            )
+            try:
+                msg = self._client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=4,
+                    system=_FOLLOWUP_SYSTEM,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                answer = msg.content[0].text.strip().lower()
+                if answer.startswith(("followup", "new")):
+                    return answer.startswith("followup")
+            except Exception as exc:
+                log.warning("Router: follow-up check failed (%s) — using heuristic", exc)
+        return looks_like_followup(instruction)
 
     def _classify(self, instruction: str) -> str:
         if self._ready and self._client:

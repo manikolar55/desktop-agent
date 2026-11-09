@@ -100,10 +100,12 @@ def plan_next_step(
     instruction: str,
     completed_steps: list[dict],
     config=None,
+    context: str | None = None,
 ) -> dict | None:
     """Return the next step to execute, or None when the task is done.
 
     completed_steps: list of {"description", "tool", "result"} for executed steps.
+    context: previous-task summary when this instruction is a follow-up.
     """
     provider = get_provider()
     base_system = config.system_prompt if config else SYSTEM_PROMPT
@@ -111,7 +113,9 @@ def plan_next_step(
     allowed = set(config.allowed_tools) if config and config.allowed_tools else None
 
     lines = [f"User instruction: {instruction}"]
-    if config:
+    if context:
+        lines.append("\n" + context)
+    if config and not context:
         try:
             from agent.learning import hints_for
             hints = hints_for(instruction, config.name)

@@ -21,6 +21,8 @@ Your available tools:
 - file_search: {"query": "..."} — search the indexed file system by filename or partial name
     Examples: {"query": "cv"} {"query": "report.pdf"} {"query": ".xlsx"} {"query": "project"}
 - file_open: {"path": "C:/full/path/to/file.ext"} — open a file with its default Windows app
+    Add "reveal": true to open the FOLDER that contains the file with the file selected.
+- speak_answer: {"answer": "..."} — say a short answer out loud (e.g. which folder a file is in)
 - file_index_rebuild: {} — trigger a fresh scan of the computer (use if search returns nothing)
 - file_read: {"path": "..."} — read the text content of a file (txt, py, md, csv, etc.)
 - shell_run: {"command": "..."} — run a PowerShell command (e.g. to list folder contents)
@@ -31,6 +33,13 @@ RULES:
 - If file_search returns multiple results, pick the one in Desktop/Downloads/Documents first.
 - If file_search returns nothing: try a shorter query, then try file_index_rebuild.
 - After finding a path, use file_open to open it.
+- The search matches words anywhere in the full path (folder names too, ignoring dots, dashes and
+  brackets), so use the distinctive words of the name the user said, not filler like "the ... movie".
+- "Where is X" / "where is X downloaded" → find it, SAY it briefly with speak_answer (drive and folder name only, e.g. "It is on drive D in the <folder name> folder"; never read out brackets or long codes),
+  and when the user also asks to open its folder use file_open {"path": <the file found>, "reveal": true}.
+  Never open Downloads (or any folder) by guessing: open the folder that actually holds the file.
+- The index covers all drives (C:, D:, ...). A movie is usually a folder of the same name on any drive.
+- file_search is instant: if it found a match, do not search again.
 - For "show me what's on my Desktop" → shell_run: {"command": "dir C:\\Users\\%USERNAME%\\Desktop"}
 - For "find all PDFs" → file_search: {"query": ".pdf"}
 - For "where is my CV" → file_search: {"query": "cv"} then file_search: {"query": "resume"}
@@ -48,7 +57,7 @@ Return ONLY valid JSON. No markdown, no explanation.
 """.strip()
 
 ALLOWED_TOOLS = [
-    "file_search", "file_open", "file_index_rebuild",
+    "file_search", "file_open", "file_index_rebuild", "speak_answer",
     "file_read", "shell_run", "ask_user", "no_op",
 ]
 

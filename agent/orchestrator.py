@@ -95,9 +95,26 @@ class Orchestrator:
             if task.status == TaskStatus.CANCELLED:
                 continue
             self._loop.reset_stop()
+            from agent import session
             config = router.route(task.instruction)
+            prev = session.last()
+            task.metadata["followup"] = False
+            # Skip the extra LLM call unless the task could plausibly continue a screen task
+            maybe = config.name in session.STATEFUL_AGENTS or session.looks_like_followup(task.instruction)
+            if prev and maybe and router.is_followup(task.instruction, prev):
+                task.metadata["followup"] = True
+                task.metadata["context"] = session.context_block(prev)
+                if config.name not in ("browser", "desktop", "email_chat", "file_docs"):
+                    config = router.config_for(prev.agent)
+                elif config.name != prev.agent and prev.agent in ("browser", "desktop"):
+                    config = router.config_for(prev.agent)
+                log.info("Follow-up to '%s' — continuing with agent %s", prev.instruction[:50], config.name)
             log.info("Starting task %s [%s]: %s", task.id[:8], config.name, task.instruction[:80])
             self._loop.run(task, config=config)
+            try:
+                session.remember(task, config.name)
+            except Exception as exc:
+                log.debug("Could not remember task: %s", exc)
 
     # ── Tool dispatch ─────────────────────────────────────────────────────────
 
@@ -331,8 +348,9 @@ class Orchestrator:
             title = params.get("title", "")
             win = adapter.find_window(title)
             if win:
-                adapter.focus_window(win)
-                return f"Focused window: '{win.title}'"
+                if adapter.focus_window(win):
+                    return f"Focused window: '{win.title}'"
+                return f"Found '{win.title}' but could not bring it to the front"
             return f"No window found matching '{title}'"
 
         if tool == "open_app":
@@ -525,6 +543,10 @@ class Orchestrator:
         if not os.path.exists(path):
             return f"File not found: {path}"
         try:
+            if params.get("reveal") and os.path.isfile(path):
+                import subprocess
+                subprocess.Popen(["explorer", f"/select,{os.path.normpath(path)}"])
+                return f"Opened the folder and selected: {path}"
             os.startfile(path)
             return f"Opened: {path}"
         except Exception as exc:

@@ -42,6 +42,10 @@ _CLEAN_SYSTEM = (
     "'you tube'→'YouTube', 'goggle'→'Google', 'chrone'→'Chrome'\n"
     "- Remove filler: 'for me', 'please', 'I want you to', 'can you', 'that is already open'\n"
     "- Keep app names, URLs, search terms intact\n"
+    "- NEVER replace an unclear word with a different specific place or app. If a folder name is "
+    "garbled or missing ('open dad folder', 'open that folder'), write 'open its folder' — do not "
+    "guess 'Downloads'\n"
+    "- Keep ALL parts of a multi-part request, in order\n"
     "- If the instruction has repeated sentences, keep only one clean version\n"
     "- Return ONLY the cleaned instruction — no explanation, no quotes\n\n"
     "Examples:\n"
@@ -54,6 +58,8 @@ _CLEAN_SYSTEM = (
     "  'Open the Chrome browser and search up for a new app open the existing Chrome browser not the new one'"
     " → 'Search for new apps in existing Chrome window'\n"
     "  'Search Upwork in the new tab of the browser' → 'Open Upwork in a new Chrome tab'\n"
+    "  'Check where that movie is downloaded. Open the dad folder.' → "
+    "'Find the movie, tell me where it is, and open its folder'\n"
 )
 
 

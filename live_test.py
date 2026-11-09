@@ -15,6 +15,7 @@ SCENARIOS = {
     "desktop":   ("Open Notepad", "desktop", 90),
     "screen_qa": ("Which project do I have open in PyCharm right now?", "desktop", 90),
     "screen_qa2": ("Look at my screen and tell me what I am doing", "desktop", 90),
+    "tab":       ("Open Chrome and check what tab is currently open and what it's doing", "browser", 120),
     "youtube":   ("Open YouTube in Chrome, search for songs and play the first video", "browser", 240),
 }
 

@@ -35,7 +35,11 @@
       "Bash(PYTHONIOENCODING=utf-8 python data/_live_lang.py)",
       "Bash(PYTHONIOENCODING=utf-8 python data/_live_e2e.py)",
       "Bash(PYTHONIOENCODING=utf-8 python live_test.py explorer desktop)",
-      "Bash(PYTHONIOENCODING=utf-8 python live_test.py screen_qa2 youtube)"
+      "Bash(PYTHONIOENCODING=utf-8 python live_test.py screen_qa2 youtube)",
+      "Bash(PYTHONIOENCODING=utf-8 python data/_live_tab.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python -u data/_live_tab.py)",
+      "Bash(grep -v \"^OK\\\\|^$\")",
+      "Bash(PYTHONIOENCODING=utf-8 python -u data/_ex.py)"
     ]
   }
 }
